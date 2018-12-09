@@ -1,0 +1,64 @@
+---
+title: "STA721 Final Project"
+author: "Shuangjie Zhang, Xiyang Hu"
+date: "12/8/2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(ggplot2)
+```
+
+## EDA
+
+\newpage
+
+```{r, echo=F}
+## clean data
+bioassay = read.table("http://stat.duke.edu/sites/stat.duke.edu/files/bioassay.txt",
+                       header=T, stringsAsFactors = F)
+bioassay = bioassay[-which(bioassay[, 2]=='.'),]
+bioassay$uterus = as.numeric(bioassay$uterus)
+bioassay$weight = as.numeric(bioassay$weight)
+bioassay$protocol = as.factor(bioassay$protocol)
+bioassay$EE = as.factor(bioassay$EE)
+bioassay$lab = as.factor(bioassay$lab)
+bioassay$ZM = as.factor(bioassay$ZM)
+bioassay$group = as.factor(bioassay$group)
+bioassay = bioassay[, c(2,3,1,4:7)]
+#str(bioassay)
+```
+
+```{r, echo=F}
+## EDA plot
+ggplot(data=bioassay,mapping = aes(y = uterus,x = lab,color=ZM))+
+  geom_boxplot()+theme_bw()+facet_wrap(~ protocol) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  labs(x = "Lab", y="Uterus weight (mg)", title="The side-by-side boxplot of uterus weight to 
+       estrogen antagonist(ZM), facet by protocol", caption="", colour="ZM(mg/kg/day)")
+
+
+ggplot(data=bioassay,mapping = aes(y = uterus,x = weight,color=lab))+
+  geom_point(size = 0.75, alpha = 0.5)+ geom_smooth(method="lm", se = F) +theme_bw()+facet_wrap(~ protocol, scales="free")+
+  labs(x = "Body weight (g)", y="Uterus weight (mg)", title="The side-by-side scatterplots of Uterus weight to 
+       Body weight (g), facet by protocol", caption="", colour="")
+
+ggplot(data=bioassay,mapping = aes(y = uterus,x = lab,color=EE))+
+  geom_boxplot()+theme_bw()+facet_wrap(~ protocol) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  labs(x = "Lab", y="Uterus weight (mg)", title="The side-by-side boxplot of uterus weight for different labs and 
+       different dose of estrogen agonist(EE), facet by protocol", caption="", colour="EE(mg/kg/day)")
+
+
+```
+
+## Model Part I
+
+## Model Part II
+
+## Model Part III
+
+
+
