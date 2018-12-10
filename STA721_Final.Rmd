@@ -134,11 +134,6 @@ lm.full = lm(log(uterus)~EE*lab+EE*protocol+ZM*lab+ZM*protocol+protocol+log(weig
 plot(lm.full)
 ```
 
-```{r}
-lm.full = lm(uterus~EE*lab+EE*protocol+ZM*lab+ZM*protocol+protocol+weight, data = bioassay)
-plot(lm.full)
-```
-
 ### a. 
 
 Is the uterotrophic bioassay successful overall at identifying estrogenic effects of EE and anti- estrogenic effects of ZM? Do some labs fail to detect such effects? At what dose level of EE is there a change relative to the control and does this level vary across labs?
@@ -176,7 +171,7 @@ See tables in a.
 n = nrow(bioassay)
 p = ncol(model.matrix(lm.full)) - 1
 
-bas1 = bas.lm(uterus~EE*lab+EE*protocol+ZM*lab+ZM*protocol+protocol+weight, 
+bas1 = bas.lm(log(uterus)~EE*lab+EE*protocol+ZM*lab+ZM*protocol+protocol+log(weight), 
               data = bioassay,
               prior = "hyper-g-n",
               alpha = n,
@@ -278,6 +273,7 @@ jags.mcmc = as.mcmc(jags.result$BUGSoutput$sims.matrix)
 jags.df = as.data.frame(jags.mcmc)
 
 jags.df
+colnames(X0)
 ```
 
 
