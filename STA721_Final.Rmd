@@ -10,8 +10,14 @@ knitr::opts_chunk$set(echo = TRUE)
 library(dplyr)
 library(ggplot2)
 library(BAS)
-library(knitr)
 library(R2jags)
+library(tibble)
+library(dplyr)
+library(purrr)
+library(tidyr)
+library(ggplot2)
+library(stringr)
+library(knitr)
 ```
 
 #### 1. Summary
@@ -32,7 +38,7 @@ The first plot listed int he third page is a side-by-side boxplot of uterus weig
 
 There is only two continuous variable, so in the next step of EDA we look at the relationship between uterus weight and body weight. The second plot listed in the third page is a side-by-side scatterplots of uterus weight to body weight in different labs. We find that in protocol D the slop is almost the same. Therefore, this effect is consistent across the labs. However in protocol A,B, there is no significant relationship between uterus weight and body weight. 
 
-#### 4. Method and Model I:
+#### 4. Model and Result:
 
 We build a linear regression model excluding the `group` variable, because the group index varies in labs and cannot be considered as a factor. We treat all variables but `uterus` and `weight` as a factor. In order to use one full model to address all question, we include the interaction term of EE:protocol, ZM:protocol, EE:lab, ZM:lab. From EDA part we can find that some experiments are not done in some EE:ZM combination. So we cannot include this interaction term. Then we use `boxcox` and find that the log transformation is preferred. Therefore, the final model will be:
 
@@ -43,9 +49,20 @@ $$
 \end{aligned}
 $$ 
 
-#### 5. Result and Conclusion
+For detecting effect of EE and ZM, we can do a F-test with the null hypothesis assuming all coefficients of EE an ZM are 0. The F-statistics is $F=\frac{\parallel (P_k - P_{k-1})Y \parallel ^2/(r(P_k)-r(P_{k-1}))}{\hat{\sigma}^2}$. Instead of constructing a function, here we use anova function to do the test procedure.
 
+From the result of the model, we can see that becasue there is only one combination of EE and ZM across all labs. That is when EE equals to 3. So the change does point for EE is 3. And we can see that the adjusted $R^2$ is really high about 0.9. So we think that we have verified the effect.
 
+According the residuals and Cook's distance, there are three possible outliers(1426,926,1586). And they all shares the same feature from protocol C and D. And also small amount of experiments are done in protocol C and D. So protocol A and B are preferred.
+
+#### 5. Conclusion
+
+First of all, according to the results of our model, uterotrophic bioassay is significantly successful overall at identifying estrogenic effects of EE and anti-estrogenic effects of ZM. There are some labs which fail to detect such effects, i.e. Exxon. At the does 1 of EE, there is a significant change relative to the control ($\alpha=0.05$). This level does vary across labs, for example, at Bayer lab, there is a significant change at the does 3 of EE.
+
+The does response does vary across labs. At Bayer lab, there is a significant change at the does 3 of EE rather than does 1. At ChungKor, Citfranc and Huntingd, there are a significant changes at the does 0.1 of EE. 
+At Denmark, InEnvTox, labPoulenc, labSumitomo, labTNO and labZeneca, there are a significant changes at the does 0.3 of EE.
+
+Similarly, it is easy to see that the protocols do differ in their sensitivity to detect estrogenic and anti-estrogenic effects. Protocol A can be recommeded, because it is the most consistent one among labs. Moreover, compared with other protocols, the variance of protocol A is also much smaller than the rest protocols.
 
 \newpage
 
@@ -78,9 +95,13 @@ ggplot(data=bioassay,mapping = aes(y = uterus,x = weight,color=lab))+
   geom_point(size = 0.75, alpha = 0.5)+ geom_smooth(method="lm", se = F) +theme_bw()+facet_wrap(~ protocol, scales="free")+
   labs(x = "Body weight (g)", y="Uterus weight (mg)", title="The side-by-side scatterplots of Uterus weight to 
        Body weight (g), facet by protocol", caption="", colour="")
+
+ggplot(data=bioassay,mapping = aes(y = uterus,x = lab,color=EE))+
+  geom_boxplot()+theme_bw()+facet_wrap(~ protocol) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  labs(x = "Lab", y="Uterus weight (mg)", title="The side-by-side boxplot of uterus weight for different labs and 
+       different dose of estrogen agonist(EE), facet by protocol", caption="", colour="EE(mg/kg/day)")
 ```
-
-
 
 \newpage
 
