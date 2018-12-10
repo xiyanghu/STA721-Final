@@ -104,6 +104,15 @@ summary(randomeffect)
 ```
 
 
+```{r}
+lm.full = lm(uterus~EE*lab+EE*protocol+ZM*lab+ZM*protocol+protocol+weight, data = bioassay)
+summary(lm.full)
+anova(lm.full)
+```
+
+
+
+
 ## Model Part II
 
 ## Model Part III
