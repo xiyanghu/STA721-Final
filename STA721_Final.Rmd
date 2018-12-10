@@ -1,0 +1,272 @@
+---
+title: "STA721 Final Project"
+author: "Shuangjie Zhang, Xiyang Hu"
+date: "12/8/2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(ggplot2)
+library(BAS)
+library(R2jags)
+library(tibble)
+library(dplyr)
+library(purrr)
+library(tidyr)
+library(ggplot2)
+library(stringr)
+library(knitr)
+```
+
+#### 1. Summary
+
+#### 2. Introductions
+
+#### 3. Model And Result
+
+#### 4. Conclusion
+
+
+
+\newpage
+
+```{r, echo=F}
+## clean data
+bioassay = read.table("http://stat.duke.edu/sites/stat.duke.edu/files/bioassay.txt",
+                       header=T, stringsAsFactors = F)
+bioassay = bioassay[-which(bioassay[, 2]=='.'),]
+bioassay$uterus = as.numeric(bioassay$uterus)
+bioassay$weight = as.numeric(bioassay$weight)
+bioassay$protocol = as.factor(bioassay$protocol)
+bioassay$EE = as.factor(bioassay$EE)
+bioassay$lab = as.factor(bioassay$lab)
+bioassay$ZM = as.factor(bioassay$ZM)
+bioassay$group = as.factor(bioassay$group)
+bioassay = bioassay[, c(2,3,1,4:7)]
+#str(bioassay)
+```
+
+```{r, echo=F}
+## EDA plot
+ggplot(data=bioassay,mapping = aes(y = uterus,x = lab,color=ZM))+
+  geom_boxplot()+theme_bw()+facet_wrap(~ protocol) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  labs(x = "Lab", y="Uterus weight (mg)", title="The side-by-side boxplot of uterus weight to 
+       estrogen antagonist(ZM), facet by protocol", caption="", colour="ZM(mg/kg/day)")
+
+
+ggplot(data=bioassay,mapping = aes(y = uterus,x = weight,color=lab))+
+  geom_point(size = 0.75, alpha = 0.5)+ geom_smooth(method="lm", se = F) +theme_bw()+facet_wrap(~ protocol, scales="free")+
+  labs(x = "Body weight (g)", y="Uterus weight (mg)", title="The side-by-side scatterplots of Uterus weight to 
+       Body weight (g), facet by protocol", caption="", colour="")
+```
+
+
+
+\newpage
+
+## Apeendix
+
+#### EDA
+
+```{r}
+
+bioassay_lm = bioassay[,-7]
+str(bioassay_lm)
+table(bioassay_lm$EE, bioassay_lm$ZM)
+
+
+ggplot(data=bioassay,mapping = aes(y = uterus,x = lab,color=EE))+
+  geom_boxplot()+theme_bw()+facet_wrap(~ protocol) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  labs(x = "Lab", y="Uterus weight (mg)", title="The side-by-side boxplot of uterus weight for different labs and 
+       different dose of estrogen agonist(EE), facet by protocol", caption="", colour="EE(mg/kg/day)")
+```
+
+## Model Part I
+
+
+```{r}
+
+lm1 = lm(uterus~., data = bioassay_lm)
+summary(lm1)
+step(lm1, k=log(2677))
+library(MASS)
+box =boxcox(lm1)
+
+
+lm2 = lm(formula = log(uterus) ~ log(weight) + protocol + EE + ZM + lab, data = bioassay_lm)
+summary(lm2)
+
+par(mfrow=c(2,2))
+plot(lm1)
+```
+
+Frequentist Random Effect Model:
+
+```{r}
+library(lme4)
+randomeffect = lmer(log(uterus) ~ log(weight) + protocol + EE + ZM + (1+EE+ZM|lab), data = bioassay_lm)
+summary(randomeffect)
+```
+
+
+```{r}
+lm.full = lm(uterus~EE*lab+EE*protocol+ZM*lab+ZM*protocol+protocol+weight, data = bioassay)
+plot(lm.full)
+```
+
+### a. 
+
+Is the uterotrophic bioassay successful overall at identifying estrogenic effects of EE and anti- estrogenic effects of ZM? Do some labs fail to detect such effects? At what dose level of EE is there a change relative to the control and does this level vary across labs?
+
+```{r}
+anova(lm.full)
+
+coefs = summary(lm.full)$coefficients %>% data.frame()
+colnames(coefs)=c("Estimate", "Std.Error", "t.value", "P.value")
+kable(coefs)
+```
+
+```{r, eval=FALSE}
+t.test(lm.obj = lm.full, str.ee = "EE", str.lab = "lab", str.ori = "lab") %>% 
+  kable(.,caption = "T-test of EE across labs")
+t.test(lm.obj = lm.full, str.ee = "ZM", str.lab = "lab", str.ori = "lab") %>% 
+  kable(.,caption = "T-test of EE across labs")
+```
+
+### b. 
+
+Does the dose response vary across labs? If so, are there certain labs that stand out as being different?
+
+See tables in a.
+
+### c.
+
+Do the protocols differ in their sensitivity to detecting estrogenic and anti-estrogenic effects? If so, is there one protocol that can be recommended?
+
+See tables in a.
+
+## Model Part II
+
+```{r, cache=TRUE}
+n = nrow(bioassay)
+p = ncol(model.matrix(lm.full)) - 1
+
+bas1 = bas.lm(uterus~EE*lab+EE*protocol+ZM*lab+ZM*protocol+protocol+weight, 
+              data = bioassay,
+              prior = "hyper-g-n",
+              alpha = n,
+              method = "MCMC",
+              MCMC.iterations = 10^6)
+```
+
+```{r, cache=TRUE}
+image(bas1)
+diagnostics(bas1, type = "pip")
+diagnostics(bas1, type = "model")
+```
+
+### a. 
+
+Is the uterotrophic bioassay successful overall at identifying estrogenic effects of EE and anti- estrogenic effects of ZM? Do some labs fail to detect such effects? At what dose level of EE is there a change relative to the control and does this level vary across labs?
+
+```{r, cache=TRUE}
+plot(bas1)
+par(mfrow=c(2,2))
+plot(coef(bas1), ask=F)
+```
+
+
+### b. 
+
+Does the dose response vary across labs? If so, are there certain labs that stand out as being different?
+
+See figures in a.
+
+### c.
+
+Do the protocols differ in their sensitivity to detecting estrogenic and anti-estrogenic effects? If so, is there one protocol that can be recommended?
+
+```{r}
+confint(coef(bas1))
+```
+
+
+## Model Part III
+
+```{r, cache=TRUE}
+## X matrix and scale
+X0 = model.matrix(lm.full)[,-1]
+X.scaled = scale(X0)/sqrt(n-1)
+
+## data for jags
+data = list(Y = bioassay$uterus, X = X.scaled, p = p, n = n)
+data$scales =  attr(X.scaled, "scaled:scale")*sqrt(n-1) + 0.00001
+data$Xbar = attr(X.scaled, "scaled:center")
+
+## JAGS
+rr.model = function() {
+  a <- 2
+  shape<-a/2
+
+  for (i in 1:n) {
+    mu[i] <- alpha0 + inprod(X[i,], alpha)
+    Y[i] ~ dnorm(0, phi)
+  }
+  phi ~ dgamma(1.0E-6, 1.0E-6)  ##jags do not allow improper prior
+  alpha0 ~ dnorm(0, 1.0E-6) 
+
+  for (j in 1:p) {
+    phi.l[j] <- pow(i.phi.l[j], -2)    
+    prec.beta[j] <- lambda.l[j]*phi*phi.l[j]
+    alpha[j] ~ dnorm(0, prec.beta[j])
+    # transform back to original coefficients
+    beta[j] <- alpha[j]/scales[j]
+    lambda.l[j] ~ dgamma(shape, shape)
+    i.phi.l[j] ~ dt(0,1,1)%_%T(0,)
+  }
+
+  # transform intercept to usual parameterization 
+  beta0 <- alpha0 - inprod(beta[1:p], Xbar)
+
+  sigma <- pow(phi, -.5)
+}
+
+## parameters to monitor
+parameters = c("beta0", "beta", "sigma","lambda.l", "phi.l")
+
+## run jags
+jags.result = jags(data, inits=NULL, par=parameters,
+                   model=rr.model, n.iter=30000)
+```
+
+```{r}
+saveRDS(jags.result, "jags.result.rds")
+jags.result=readRDS("jags.result.rds")
+```
+
+### a. 
+
+Is the uterotrophic bioassay successful overall at identifying estrogenic effects of EE and anti- estrogenic effects of ZM? Do some labs fail to detect such effects? At what dose level of EE is there a change relative to the control and does this level vary across labs?
+
+```{r}
+jags.mcmc = as.mcmc(jags.result$BUGSoutput$sims.matrix)
+jags.df = as.data.frame(jags.mcmc)
+
+jags.df
+```
+
+
+### b. 
+
+Does the dose response vary across labs? If so, are there certain labs that stand out as being different?
+
+See figures in a.
+
+### c.
+
+Do the protocols differ in their sensitivity to detecting estrogenic and anti-estrogenic effects? If so, is there one protocol that can be recommended?
+
