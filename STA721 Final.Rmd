@@ -2,6 +2,8 @@
 title: "STA721 Final Project"
 author: "Shuangjie Zhang, Xiyang Hu"
 date: "12/8/2018"
+header-includes:
+   - \usepackage{amsmath}
 output: pdf_document
 ---
 
@@ -15,9 +17,20 @@ library(ggplot2)
 
 #### 2. Introductions
 
-#### 3. Model And Result
+#### 3. EDA
 
-#### 4. Conclusion
+#### 4. Model I And Result
+
+We build a linear regression model excluding the `group` variable, because the group index varies in labs and cannot be considered as a factor. After looking into the data, we treat all variables but `uterus` and `weight` as factor. In order to use one full model to address all question, we include the interaction term of EE:protocol, ZM:protocol, EE:lab, ZM:lab. From EDA part we can find that some experiments are not done in some EE:ZM combination. So we cannot include this interaction term. Then we use `boxcox` and find that the log transformation is preferred. Therefore, the final model will be:
+
+$$
+\begin{aligned}
+\log(\text{uterus})=\beta_0+\beta_1\log(\text{weight})&+\beta_2\text{EE}+\beta_3\text{ZM}+\beta_4\text{lab}+\beta_5\text{protocol}\\+\beta_6\text{EE:lab}+\beta_7\text{ZM:lab}&+\beta_8\text{EE:protocol}+\beta_9\text{ZM:protocol}+\epsilon\\
+&\epsilon\sim N(0,\sigma^2)
+\end{aligned}
+$$ 
+
+#### 5. Conclusion
 
 
 
@@ -58,7 +71,7 @@ ggplot(data=bioassay,mapping = aes(y = uterus,x = weight,color=lab))+
 
 \newpage
 
-## Apeendix
+## Appendix
 
 #### EDA
 
@@ -80,16 +93,14 @@ ggplot(data=bioassay,mapping = aes(y = uterus,x = lab,color=EE))+
 
 
 ```{r}
-
 lm1 = lm(uterus~., data = bioassay_lm)
-summary(lm1)
+#summary(lm1)
 step(lm1, k=log(2677))
 library(MASS)
 box =boxcox(lm1)
-
-
 lm2 = lm(formula = log(uterus) ~ log(weight) + protocol + EE + ZM + lab, data = bioassay_lm)
-summary(lm2)
+lm3 = lm(formula = log(uterus) ~ log(weight) + protocol + EE*lab +ZM*lab, data = bioassay_lm)
+#summary(lm3)
 
 par(mfrow=c(2,2))
 plot(lm1)
@@ -100,14 +111,14 @@ Frequentist Random Effect Model:
 ```{r}
 library(lme4)
 randomeffect = lmer(log(uterus) ~ log(weight) + protocol + EE + ZM + (1+EE+ZM|lab), data = bioassay_lm)
-summary(randomeffect)
+#summary(randomeffect)
 ```
 
 
 ```{r}
 lm.full = lm(uterus~EE*lab+EE*protocol+ZM*lab+ZM*protocol+protocol+weight, data = bioassay)
-summary(lm.full)
-anova(lm.full)
+#summary(lm.full)
+#anova(lm.full)
 ```
 
 
