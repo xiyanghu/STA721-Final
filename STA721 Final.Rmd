@@ -2,6 +2,8 @@
 title: "STA721 Final Project"
 author: "Shuangjie Zhang, Xiyang Hu"
 date: "12/8/2018"
+header-includes:
+   - \usepackage{amsmath}
 output: pdf_document
 ---
 
@@ -9,15 +11,34 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE)
 library(dplyr)
 library(ggplot2)
+library(BAS)
+library(knitr)
 ```
 
 #### 1. Summary
 
+International mutilaboratory studies shows that the weight of the uterus, with uterus weight expected to exhibit an increasing dose response trend for chemicals acting as estrogen agonists and with estrogen antagonists (ZM) acting to block such estrogen effects. After fitting a linear regression including the interaction term of `EE` and `ZM` with `lab` and `protocol`, we verify that as expected the effects are significant. But these results are are not consistent among labs, even some data from certain labs can be considered as outlier and fails to detect the effect.
+
 #### 2. Introductions
 
-#### 3. Model And Result
+Using the rats to test the effect of estrogen agonists and antagonists on the weight of the uterus is one new approach for screening chemicals for endocrine disrupting effects. An international multilaboratory study was conducted to compare the results of the rat uterotrophic bioassay using a known estrogen agonist (EE) and a known estrogen antagonist (ZM),  The overall effect is expected to be that the uterus gets heavier with the increase of estrogen agonist (EE) dose. The main goal of the study was to assess whether the results were consistent across the laboratories.
 
-#### 4. Conclusion
+The dataset from different labs is in a dataframe format with a total of seven variables. The response variable is Uterus weight `uterus` in unit mg. The covariate variables are: `EE`(Dose of estrogen agonist,mg/kg/day), `ZM`(Dose of estrogen antagonist, mg/kg/day). Other variables such as lab`, `protocol`, `group` explains which kind of rats are used in which location of lab in which group. These covariates are all in factor format and has different levels. Only body weight of rats `weight` is measured in gram.
+
+#### 3. EDA
+
+#### 4. Model I And Result
+
+We build a linear regression model excluding the `group` variable, because the group index varies in labs and cannot be considered as a factor. After looking into the data, we treat all variables but `uterus` and `weight` as factor. In order to use one full model to address all question, we include the interaction term of EE:protocol, ZM:protocol, EE:lab, ZM:lab. From EDA part we can find that some experiments are not done in some EE:ZM combination. So we cannot include this interaction term. Then we use `boxcox` and find that the log transformation is preferred. Therefore, the final model will be:
+
+$$
+\begin{aligned}
+\log(\text{uterus})=\beta_0+\beta_1\log(\text{weight})&+\beta_2\text{EE}+\beta_3\text{ZM}+\beta_4\text{lab}+\beta_5\text{protocol}\\+\beta_6\text{EE:lab}+\beta_7\text{ZM:lab}&+\beta_8\text{EE:protocol}+\beta_9\text{ZM:protocol}+\epsilon\\
+&\epsilon\sim N(0,\sigma^2)
+\end{aligned}
+$$ 
+
+#### 5. Conclusion
 
 
 
@@ -58,7 +79,7 @@ ggplot(data=bioassay,mapping = aes(y = uterus,x = weight,color=lab))+
 
 \newpage
 
-## Apeendix
+## Appendix
 
 #### EDA
 
@@ -80,16 +101,14 @@ ggplot(data=bioassay,mapping = aes(y = uterus,x = lab,color=EE))+
 
 
 ```{r}
-
 lm1 = lm(uterus~., data = bioassay_lm)
-summary(lm1)
+#summary(lm1)
 step(lm1, k=log(2677))
 library(MASS)
 box =boxcox(lm1)
-
-
 lm2 = lm(formula = log(uterus) ~ log(weight) + protocol + EE + ZM + lab, data = bioassay_lm)
-summary(lm2)
+lm3 = lm(formula = log(uterus) ~ log(weight) + protocol + EE*lab +ZM*lab, data = bioassay_lm)
+#summary(lm3)
 
 par(mfrow=c(2,2))
 plot(lm1)
@@ -97,15 +116,16 @@ plot(lm1)
 
 Frequentist Random Effect Model:
 
-```{r}
+```{r, warning=F}
 library(lme4)
 randomeffect = lmer(log(uterus) ~ log(weight) + protocol + EE + ZM + (1+EE+ZM|lab), data = bioassay_lm)
-summary(randomeffect)
+#summary(randomeffect)
 ```
 
 
 ```{r}
-lm.full = lm(uterus~EE*lab+EE*protocol+ZM*lab+ZM*protocol+protocol+weight, data = bioassay)
+par(mfrow=c(2,2))
+lm.full = lm(log(uterus)~EE*lab+EE*protocol+ZM*lab+ZM*protocol+protocol+log(weight), data = bioassay)
 plot(lm.full)
 ```
 
