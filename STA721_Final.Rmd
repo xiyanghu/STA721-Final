@@ -171,7 +171,7 @@ See tables in a.
 n = nrow(bioassay)
 p = ncol(model.matrix(lm.full)) - 1
 
-bas1 = bas.lm(uterus~EE*lab+EE*protocol+ZM*lab+ZM*protocol+protocol+weight, 
+bas1 = bas.lm(log(uterus)~EE*lab+EE*protocol+ZM*lab+ZM*protocol+protocol+log(weight), 
               data = bioassay,
               prior = "hyper-g-n",
               alpha = n,
@@ -179,7 +179,7 @@ bas1 = bas.lm(uterus~EE*lab+EE*protocol+ZM*lab+ZM*protocol+protocol+weight,
               MCMC.iterations = 10^6)
 ```
 
-```{r}
+```{r, cache=TRUE}
 image(bas1)
 diagnostics(bas1, type = "pip")
 diagnostics(bas1, type = "model")
@@ -189,9 +189,10 @@ diagnostics(bas1, type = "model")
 
 Is the uterotrophic bioassay successful overall at identifying estrogenic effects of EE and anti- estrogenic effects of ZM? Do some labs fail to detect such effects? At what dose level of EE is there a change relative to the control and does this level vary across labs?
 
-```{r}
+```{r, cache=TRUE}
 plot(bas1)
-#plot(coef(bas1), ask=F)
+par(mfrow=c(3,4))
+plot(coef(bas1), ask=F)
 ```
 
 
@@ -212,14 +213,24 @@ confint(coef(bas1))
 
 ## Model Part III
 
-```{r, eval=F, cache=TRUE}
+```{r, cache=TRUE}
+bioassay1 = bioassay
+bioassay1$EE = bioassay1$EE %>% as.character() %>% as.numeric()
+bioassay1$ZM = bioassay1$ZM %>% as.character() %>% as.numeric()
+lm.jags = lm(log(uterus)~EE*lab+EE*protocol+ZM*lab+ZM*protocol+protocol+log(weight), data = bioassay1)
+
 ## X matrix and scale
-X = model.matrix(lm.full)[,-1]
-X.scaled = scale(X)/sqrt(n-1)
+X0 = model.matrix(lm.jags)[,-1]
+X.scaled = scale(X0)/sqrt(n-1)
+
+#c = data.frame(coef(lm(log(bioassay1$uterus)~X.scaled)))[,1]
+
+n = nrow(X0)
+p = ncol(X0)
 
 ## data for jags
 data = list(Y = bioassay$uterus, X = X.scaled, p = p, n = n)
-data$scales =  attr(X.scaled, "scaled:scale")*sqrt(n-1)
+data$scales =  attr(X.scaled, "scaled:scale")*sqrt(n-1) #+ 0.00001
 data$Xbar = attr(X.scaled, "scaled:center")
 
 ## JAGS
@@ -257,10 +268,10 @@ parameters = c("beta0", "beta", "sigma","lambda.l", "phi.l")
 ## run jags
 jags.result = jags(data, inits=NULL, par=parameters,
                    model=rr.model, n.iter=30000)
-saveRDS(jags.result, "jags.result.rds")
 ```
 
-```{r, eval=F}
+```{r}
+saveRDS(jags.result, "jags.result.rds")
 jags.result=readRDS("jags.result.rds")
 ```
 
@@ -268,8 +279,66 @@ jags.result=readRDS("jags.result.rds")
 
 Is the uterotrophic bioassay successful overall at identifying estrogenic effects of EE and anti- estrogenic effects of ZM? Do some labs fail to detect such effects? At what dose level of EE is there a change relative to the control and does this level vary across labs?
 
-```{r, eval=F}
-as.mcmc(jags.result$BUGSoutput$sims.matrix)
+```{r}
+jags.mcmc = as.mcmc(jags.result$BUGSoutput$sims.matrix)
+jags.df = as.data.frame(jags.mcmc)
+dim(jags.df)
+```
+
+```{r}
+cnames = colnames(X0)
+```
+
+```{r}
+is.EElab = str_detect(cnames, "EE.*lab")
+is.EEproto = str_detect(cnames, "EE.*protocol")
+is.EE = str_detect(cnames, "EE.*")&(!is.EElab)&(!is.EEproto)
+
+idx.EElab = which(is.EElab)
+idx.EEproto = which(is.EEproto)
+idx.EE = which(is.EE)
+
+EE.df = jags.df[,idx.EE] %>% as.data.frame()
+colnames(EE.df) = cnames[is.EE]
+EE.df1 = stack(EE.df)
+
+ggplot(data = EE.df1) + geom_boxplot(aes(x=ind, y=values))  + theme_bw()
+```
+
+```{r}
+is.ZMlab = str_detect(cnames, "lab.*ZM")#str_detect(cnames, "ZM.*lab")
+is.ZMproto = str_detect(cnames, "protocol.*ZM")#str_detect(cnames, "ZM.*protocol")
+is.ZM = str_detect(cnames, "ZM.*")&(!is.ZMlab)&(!is.ZMproto)
+
+idx.ZMlab = which(is.ZMlab)
+idx.ZMproto = which(is.ZMproto)
+idx.ZM = which(is.ZM)
+
+ZM.df = jags.df[,idx.ZM] %>% as.data.frame()
+colnames(ZM.df) = cnames[is.ZM]
+ZM.df1 = stack(ZM.df)
+
+ggplot(data = ZM.df1) + geom_boxplot(aes(x=ind, y=values)) + theme_bw()
+```
+
+```{r}
+EElab.df = jags.df[,idx.EElab]
+colnames(EElab.df) = cnames[is.EElab]
+EElab.df1 = stack(EElab.df)
+
+ggplot(data = EElab.df1) + geom_boxplot(aes(x=ind, y=values)) + 
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+```{r}
+ZMlab.df = jags.df[,idx.ZMlab]
+colnames(ZMlab.df) = cnames[is.ZMlab]
+ZMlab.df1 = stack(ZMlab.df)
+
+ggplot(data = ZMlab.df1) + geom_boxplot(aes(x=ind, y=values)) + 
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
 ```
 
 
@@ -283,3 +352,18 @@ See figures in a.
 
 Do the protocols differ in their sensitivity to detecting estrogenic and anti-estrogenic effects? If so, is there one protocol that can be recommended?
 
+```{r}
+EEproto.df = jags.df[,idx.EEproto]
+colnames(EEproto.df) = cnames[is.EEproto]
+EEproto.df1 = stack(EEproto.df)
+
+ggplot(data = EEproto.df1) + geom_boxplot(aes(x=ind, y=values)) + theme_bw()
+```
+
+```{r}
+ZMproto.df = jags.df[,idx.ZMproto]
+colnames(ZMproto.df) = cnames[is.ZMproto]
+ZMproto.df1 = stack(ZMproto.df)
+
+ggplot(data = ZMproto.df1) + geom_boxplot(aes(x=ind, y=values)) + theme_bw()
+```
