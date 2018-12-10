@@ -10,31 +10,31 @@ knitr::opts_chunk$set(echo = TRUE)
 library(dplyr)
 library(ggplot2)
 library(BAS)
-library(R2jags)
-library(tibble)
-library(dplyr)
-library(purrr)
-library(tidyr)
-library(ggplot2)
-library(stringr)
 library(knitr)
+library(R2jags)
 ```
 
 #### 1. Summary
 
-International mutilaboratory studies shows that the weight of the uterus, with uterus weight expected to exhibit an increasing dose response trend for chemicals acting as estrogen agonists and with estrogen antagonists (ZM) acting to block such estrogen effects. After fitting a linear regression including the interaction term of `EE` and `ZM` with `lab` and `protocol`, we verify that as expected the effects are significant. But these results are are not consistent among labs, even some data from certain labs can be considered as outlier and fails to detect the effect.
+International mutilaboratory studies shows that the weight of the uterus, with uterus weight expected to exhibit an increasing dose response trend for chemicals acting as estrogen agonists and with estrogen antagonists (ZM) acting to block such estrogen effects. After fitting a linear regression including the interaction term of `EE` and `ZM` with `lab` and `protocol`, we verify that as expected the effects are significant. But these results are are not consistent among labs, even some data from certain labs can be considered as outlier and fails to detect the effect. At dose level 3 of EE there is a change relative to the control. Protocols differs in sensitivity to detecting estrogenic and anti-estrogenic effects, and Protocol A, B are recommended. 
 
 #### 2. Introductions
 
 Using the rats to test the effect of estrogen agonists and antagonists on the weight of the uterus is one new approach for screening chemicals for endocrine disrupting effects. An international multilaboratory study was conducted to compare the results of the rat uterotrophic bioassay using a known estrogen agonist (EE) and a known estrogen antagonist (ZM),  The overall effect is expected to be that the uterus gets heavier with the increase of estrogen agonist (EE) dose. The main goal of the study was to assess whether the results were consistent across the laboratories.
 
-The dataset from different labs is in a dataframe format with a total of seven variables. The response variable is Uterus weight `uterus` in unit mg. The covariate variables are: `EE`(Dose of estrogen agonist,mg/kg/day), `ZM`(Dose of estrogen antagonist, mg/kg/day). Other variables such as lab`, `protocol`, `group` explains which kind of rats are used in which location of lab in which group. These covariates are all in factor format and has different levels. Only body weight of rats `weight` is measured in gram.
+The dataset from different labs is in a dataframe format with a total of seven variables. The response variable is Uterus weight `uterus` in unit mg. The covariate variables are: `EE`(Dose of estrogen agonist,mg/kg/day), `ZM`(Dose of estrogen antagonist, mg/kg/day). Other variables such as `lab`, `protocol`, `group` explains which kind of rats are used in which location of lab in which group. These covariates are all in factor format and has different levels. Only body weight of rats `weight` is measured in gram.
 
 #### 3. EDA
 
-#### 4. Model I And Result
+After looking into the data, we find that all variables but `uterus` and `weight` should be encoded as a factor. And from table of `EE` and `ZM`, it shows that only for EE dose level 3, there is some data in change does of ZM. So it is wiser to exclude the interaction term `EE`:`ZM`.
 
-We build a linear regression model excluding the `group` variable, because the group index varies in labs and cannot be considered as a factor. After looking into the data, we treat all variables but `uterus` and `weight` as factor. In order to use one full model to address all question, we include the interaction term of EE:protocol, ZM:protocol, EE:lab, ZM:lab. From EDA part we can find that some experiments are not done in some EE:ZM combination. So we cannot include this interaction term. Then we use `boxcox` and find that the log transformation is preferred. Therefore, the final model will be:
+The first plot listed int he third page is a side-by-side boxplot of uterus weight to ZM. It is obvious that different types of rats used will lie in different region of uterus weight. For example, for protocol A,B all the uterus weights are not larger than 200mg. And for protocol C,D the average uterus weights are larger than protocol A,B. This can be explained since protocol A,B uses immature rats and usually mature female shall have larger weight.
+
+There is only two continuous variable, so in the next step of EDA we look at the relationship between uterus weight and body weight. The second plot listed in the third page is a side-by-side scatterplots of uterus weight to body weight in different labs. We find that in protocol D the slop is almost the same. Therefore, this effect is consistent across the labs. However in protocol A,B, there is no significant relationship between uterus weight and body weight. 
+
+#### 4. Method and Model I:
+
+We build a linear regression model excluding the `group` variable, because the group index varies in labs and cannot be considered as a factor. We treat all variables but `uterus` and `weight` as a factor. In order to use one full model to address all question, we include the interaction term of EE:protocol, ZM:protocol, EE:lab, ZM:lab. From EDA part we can find that some experiments are not done in some EE:ZM combination. So we cannot include this interaction term. Then we use `boxcox` and find that the log transformation is preferred. Therefore, the final model will be:
 
 $$
 \begin{aligned}
@@ -43,7 +43,7 @@ $$
 \end{aligned}
 $$ 
 
-#### 5. Conclusion
+#### 5. Result and Conclusion
 
 
 
@@ -121,7 +121,7 @@ plot(lm1)
 
 Frequentist Random Effect Model:
 
-```{r, warning=F}
+```{r, warning=F, eval=F}
 library(lme4)
 randomeffect = lmer(log(uterus) ~ log(weight) + protocol + EE + ZM + (1+EE+ZM|lab), data = bioassay_lm)
 #summary(randomeffect)
@@ -171,7 +171,7 @@ See tables in a.
 n = nrow(bioassay)
 p = ncol(model.matrix(lm.full)) - 1
 
-bas1 = bas.lm(log(uterus)~EE*lab+EE*protocol+ZM*lab+ZM*protocol+protocol+log(weight), 
+bas1 = bas.lm(uterus~EE*lab+EE*protocol+ZM*lab+ZM*protocol+protocol+weight, 
               data = bioassay,
               prior = "hyper-g-n",
               alpha = n,
@@ -179,7 +179,7 @@ bas1 = bas.lm(log(uterus)~EE*lab+EE*protocol+ZM*lab+ZM*protocol+protocol+log(wei
               MCMC.iterations = 10^6)
 ```
 
-```{r, cache=TRUE}
+```{r}
 image(bas1)
 diagnostics(bas1, type = "pip")
 diagnostics(bas1, type = "model")
@@ -189,10 +189,9 @@ diagnostics(bas1, type = "model")
 
 Is the uterotrophic bioassay successful overall at identifying estrogenic effects of EE and anti- estrogenic effects of ZM? Do some labs fail to detect such effects? At what dose level of EE is there a change relative to the control and does this level vary across labs?
 
-```{r, cache=TRUE}
+```{r}
 plot(bas1)
-par(mfrow=c(2,2))
-plot(coef(bas1), ask=F)
+#plot(coef(bas1), ask=F)
 ```
 
 
@@ -213,14 +212,14 @@ confint(coef(bas1))
 
 ## Model Part III
 
-```{r, cache=TRUE}
+```{r, eval=F, cache=TRUE}
 ## X matrix and scale
-X0 = model.matrix(lm.full)[,-1]
-X.scaled = scale(X0)/sqrt(n-1)
+X = model.matrix(lm.full)[,-1]
+X.scaled = scale(X)/sqrt(n-1)
 
 ## data for jags
 data = list(Y = bioassay$uterus, X = X.scaled, p = p, n = n)
-data$scales =  attr(X.scaled, "scaled:scale")*sqrt(n-1) + 0.00001
+data$scales =  attr(X.scaled, "scaled:scale")*sqrt(n-1)
 data$Xbar = attr(X.scaled, "scaled:center")
 
 ## JAGS
@@ -230,7 +229,8 @@ rr.model = function() {
 
   for (i in 1:n) {
     mu[i] <- alpha0 + inprod(X[i,], alpha)
-    Y[i] ~ dnorm(0, phi)
+    prec[i] <- phi
+    Y[i] ~ dnorm(mu[i], prec[i])
   }
   phi ~ dgamma(1.0E-6, 1.0E-6)  ##jags do not allow improper prior
   alpha0 ~ dnorm(0, 1.0E-6) 
@@ -257,10 +257,10 @@ parameters = c("beta0", "beta", "sigma","lambda.l", "phi.l")
 ## run jags
 jags.result = jags(data, inits=NULL, par=parameters,
                    model=rr.model, n.iter=30000)
+saveRDS(jags.result, "jags.result.rds")
 ```
 
-```{r}
-saveRDS(jags.result, "jags.result.rds")
+```{r, eval=F}
 jags.result=readRDS("jags.result.rds")
 ```
 
@@ -268,12 +268,8 @@ jags.result=readRDS("jags.result.rds")
 
 Is the uterotrophic bioassay successful overall at identifying estrogenic effects of EE and anti- estrogenic effects of ZM? Do some labs fail to detect such effects? At what dose level of EE is there a change relative to the control and does this level vary across labs?
 
-```{r}
-jags.mcmc = as.mcmc(jags.result$BUGSoutput$sims.matrix)
-jags.df = as.data.frame(jags.mcmc)
-
-jags.df
-colnames(X0)
+```{r, eval=F}
+as.mcmc(jags.result$BUGSoutput$sims.matrix)
 ```
 
 
