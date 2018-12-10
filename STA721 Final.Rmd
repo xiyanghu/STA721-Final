@@ -11,7 +11,15 @@ library(dplyr)
 library(ggplot2)
 ```
 
-## EDA
+#### 1. Summary
+
+#### 2. Introductions
+
+#### 3. Model And Result
+
+#### 4. Conclusion
+
+
 
 \newpage
 
@@ -44,17 +52,57 @@ ggplot(data=bioassay,mapping = aes(y = uterus,x = weight,color=lab))+
   geom_point(size = 0.75, alpha = 0.5)+ geom_smooth(method="lm", se = F) +theme_bw()+facet_wrap(~ protocol, scales="free")+
   labs(x = "Body weight (g)", y="Uterus weight (mg)", title="The side-by-side scatterplots of Uterus weight to 
        Body weight (g), facet by protocol", caption="", colour="")
+```
+
+
+
+\newpage
+
+## Apeendix
+
+#### EDA
+
+```{r}
+
+bioassay_lm = bioassay[,-7]
+str(bioassay_lm)
+table(bioassay_lm$EE, bioassay_lm$ZM)
+
 
 ggplot(data=bioassay,mapping = aes(y = uterus,x = lab,color=EE))+
   geom_boxplot()+theme_bw()+facet_wrap(~ protocol) +
   theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
   labs(x = "Lab", y="Uterus weight (mg)", title="The side-by-side boxplot of uterus weight for different labs and 
        different dose of estrogen agonist(EE), facet by protocol", caption="", colour="EE(mg/kg/day)")
-
-
 ```
 
 ## Model Part I
+
+
+```{r}
+
+lm1 = lm(uterus~., data = bioassay_lm)
+summary(lm1)
+step(lm1, k=log(2677))
+library(MASS)
+box =boxcox(lm1)
+
+
+lm2 = lm(formula = log(uterus) ~ log(weight) + protocol + EE + ZM + lab, data = bioassay_lm)
+summary(lm2)
+
+par(mfrow=c(2,2))
+plot(lm1)
+```
+
+Frequentist Random Effect Model:
+
+```{r}
+library(lme4)
+randomeffect = lmer(log(uterus) ~ log(weight) + protocol + EE + ZM + (1+EE+ZM|lab), data = bioassay_lm)
+summary(randomeffect)
+```
+
 
 ## Model Part II
 
